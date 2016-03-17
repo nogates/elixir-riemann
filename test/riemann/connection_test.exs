@@ -32,6 +32,29 @@ defmodule Riemann.ConnectionTest do
     refute Process.alive?(connection)
   end
 
+  test "Connection server does not have a tcp state when is not enabled", context do
+    {:ok, connection} = Connection.start(
+      (Application.get_env(:riemann, :address)
+        |> Keyword.delete(:enabled)) ++ [ enabled: false ]
+    )
+
+    state = :sys.get_state(connection)
+    assert is_nil(state.tcp)
+  end
+
+  test "Connection server does not send messages when is not enabled", context do
+    {:ok, connection} = Connection.start(
+      (Application.get_env(:riemann, :address)
+        |> Keyword.delete(:enabled)) ++ [ enabled: false ]
+    )
+
+    msg = Msg.new(ok: false)
+    :ok = GenServer.call(connection, {:send_msg, msg})
+
+    encoded_msg = Msg.encode(msg)
+    refute_receive ^encoded_msg
+  end
+
   test "Connection sends messages encoded" do
     {:ok, connection} = Connection.start_link(Application.get_env(:riemann, :address))
 
