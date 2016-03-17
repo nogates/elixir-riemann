@@ -22,17 +22,29 @@ defmodule Riemann.Connection do
     GenServer.start(__MODULE__, state, [])
   end
 
-  def init([host: host, port: port]) do
+  # dont start the tcp connect if enabled is false
+  def init([host: _, port: _, enabled: false]) do
+    {:ok, %State{}}
+  end
+
+  def init([host: host, port: port, enabled: true]) do
     # riemann message lengths are four bytes up front
     {:ok, tcp} = :gen_tcp.connect(:erlang.binary_to_list(host), port, [:binary, nodelay: true, packet: 4, active: true])
     {:ok, %State{tcp: tcp}}
   end
 
-  def handle_call({:send_msg, msg}, from, state) do
-    :ok = :gen_tcp.send(state.tcp, Msg.encode(msg))
+  # don't send any message if state does not have a tcp connection
+  def handle_call({:send_msg, _msg}, _from, %State{tcp: nil} = state) do
+
+    { :reply, :ok, state }
+  end
+
+  def handle_call({:send_msg, msg}, from, %State{tcp: tcp} = state) do
+    :ok = :gen_tcp.send(tcp, Msg.encode(msg))
     # we'll reply once we get an ok from the server
     {:noreply, %{state | from: from}}
   end
+
   def handle_call(_msg, _from, state), do: {:reply, :unknown_msg, state}
 
   # a query that errored
