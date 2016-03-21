@@ -28,9 +28,9 @@ defmodule Riemann.Connection do
   end
 
   def init([host: host, port: port, enabled: true]) do
-    # riemann message lengths are four bytes up front
-    {:ok, tcp} = :gen_tcp.connect(:erlang.binary_to_list(host), port, [:binary, nodelay: true, packet: 4, active: true])
-    {:ok, %State{tcp: tcp}}
+    send self, { :connect, host, port }
+
+    {:ok, %State{}}
   end
 
   # don't send any message if state does not have a tcp connection
@@ -71,6 +71,16 @@ defmodule Riemann.Connection do
   def handle_info({:tcp, _port, msg}, state) do
     Logger.warn("Unexpected message from Riemann server: #{inspect msg}")
     {:noreply, state}
+  end
+
+  def handle_info({ :connect, host, port }, _) do
+    # riemann message lengths are four bytes up front
+    {:ok, tcp} = :gen_tcp.connect(
+      :erlang.binary_to_list(host), port,
+      [ :binary, nodelay: true, packet: 4, active: true ]
+    )
+
+    { :noreply, %State{tcp: tcp} }
   end
 
   # connection dropped
