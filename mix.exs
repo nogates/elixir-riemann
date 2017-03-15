@@ -6,7 +6,7 @@ defmodule Riemann.Mixfile do
   def project do
     [app: :riemann,
      version: @version,
-     elixir: "~> 1.1.0",
+     elixir: "> 1.1.0",
      deps: deps,
      aliases: [test: "test --no-start"],
      description: "A client for the Riemann event stream processor",

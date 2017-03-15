@@ -4,7 +4,7 @@ defmodule Riemann.Connection do
   alias Riemann.Proto.Msg
 
   defmodule State do
-    defstruct tcp: nil, from: nil
+    defstruct tcp: nil, from: nil, host: nil, port: nil
   end
 
   @ok_msg Msg.new(ok: true) |> Msg.encode
@@ -23,14 +23,14 @@ defmodule Riemann.Connection do
   end
 
   # dont start the tcp connect if enabled is false
-  def init([host: _, port: _, enabled: false]) do
-    {:ok, %State{}}
+  def init([host: host, port: port, enabled: false]) do
+    {:ok, %State{ host: host, port: port }}
   end
 
   def init([host: host, port: port, enabled: true]) do
-    send self, { :connect, host, port }
+    send self, :connect
 
-    {:ok, %State{}}
+    {:ok, %State{ host: host, port: port }}
   end
 
   # don't send any message if state does not have a tcp connection
@@ -73,19 +73,21 @@ defmodule Riemann.Connection do
     {:noreply, state}
   end
 
-  def handle_info({ :connect, host, port }, _) do
+  def handle_info(:connect, %State{ host: host, port: port } = state) do
     # riemann message lengths are four bytes up front
-    {:ok, tcp} = :gen_tcp.connect(
+    {:ok, tcp } = :gen_tcp.connect(
       :erlang.binary_to_list(host), port,
       [ :binary, nodelay: true, packet: 4, active: true ]
     )
 
-    { :noreply, %State{tcp: tcp} }
+    { :noreply, %{ state | tcp: tcp} }
   end
 
   # connection dropped
   def handle_info({:tcp_closed, _port}, state) do
-    {:stop, :tcp_closed, %{state | tcp: nil}}
+    send self, :connect
+
+    { :noreply, %{ state | tcp: nil } }
   end
 
 

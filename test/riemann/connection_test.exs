@@ -25,11 +25,17 @@ defmodule Riemann.ConnectionTest do
     {:ok, connection} = Connection.start(Application.get_env(:riemann, :address))
     state = :sys.get_state(connection)
     assert is_port(state.tcp)
+    assert Process.alive?(connection)
+    :gen_tcp.shutdown(state.tcp, :read)
 
-    TestServer.stop(context[:server])
+    :timer.sleep 2000 # wait for the connection-dropped message to arrive
 
-    :timer.sleep 10 # wait for the connection-dropped message to arrive
-    refute Process.alive?(connection)
+    assert Process.alive?(connection)
+
+    state = :sys.get_state(connection)
+    assert is_port(state.tcp)
+
+    GenServer.stop(connection)
   end
 
   test "Connection server does not have a tcp state when is not enabled", context do
@@ -64,5 +70,4 @@ defmodule Riemann.ConnectionTest do
     encoded_msg = Msg.encode(msg)
     assert_received ^encoded_msg
   end
-
 end
